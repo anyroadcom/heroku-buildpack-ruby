@@ -103,6 +103,7 @@ WARNING
         post_bundler
         create_database_yml
         install_binaries
+        run_assets_pull_rake_task
         run_assets_precompile_rake_task
       end
       best_practice_warnings
@@ -790,6 +791,29 @@ params = CGI.parse(uri.query || "")
 
   def node_not_preinstalled?
     !node_js_installed?
+  end
+
+  def run_assets_pull_rake_task
+    instrument 'ruby.run_assets_pull_rake_task' do
+
+      pull = rake.task("assets:pull_before_compile")
+      return true unless pull.is_defined?
+
+      topic "Pulling build assets from S3"
+      pull.invoke(env: rake_env)
+      if pull.success?
+        puts "Asset pull completed (#{"%.2f" % pull.time}s)"
+      else
+        asset_pull_fail(pull.output)
+      end
+    end
+  end
+
+  def asset_pull_fail(output)
+    log "assets_pull", :status => "failure"
+    msg = "Pulling build assets failed.\n"
+    msg << output
+    error msg
   end
 
   def run_assets_precompile_rake_task
